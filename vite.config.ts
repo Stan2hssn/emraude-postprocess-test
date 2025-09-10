@@ -11,4 +11,8 @@ export default defineConfig({
             '@images': path.resolve(__dirname, './public/images'),
         },
     },
+    server: {
+        open: true,
+    },
+
 });

@@ -1,4 +1,5 @@
 import {
+	Camera,
 	DoubleSide,
 	Mesh,
 	MeshBasicMaterial,
@@ -17,31 +18,23 @@ import { PaneUtils } from './PaneUtils';
 
 
 export default class Playground {
-	private viewport: Record<'width' | 'height', number>;
-	private camera: OrthographicCamera;
-	private scene: Scene;
-	private renderer: WebGLRenderer;
-	private mesh: Mesh;
-	private material: MeshBasicMaterial | ShaderMaterial;
-	private controls: OrbitControls;
-	public textureLoader = new TextureLoader();
-	public debugPanel: Pane | null = null;
+	private _viewport: Record<'width' | 'height', number>;
+	private _camera: OrthographicCamera | Camera | null = null;
+	private _scene: Scene | null = null;
+	private _renderer: WebGLRenderer | null = null;
+	private _mesh: Mesh | null = null;
+	private _material: MeshBasicMaterial | ShaderMaterial | null = null;
+	private _controls: OrbitControls | null = null;
+	public _textureLoader = new TextureLoader();
+	public _debugPanel: Pane | null = null;
 
 
 
 	constructor(canvas: HTMLCanvasElement) {
-		this.viewport = {
+		this._viewport = {
 			width: window.innerWidth,
 			height: window.innerHeight,
 		} as Record<'width' | 'height', number>;
-		this.camera = null as unknown as OrthographicCamera;
-		this.scene = null as unknown as Scene;
-		this.renderer = null as unknown as WebGLRenderer;
-		this.mesh = null as unknown as Mesh;
-		this.material = null as unknown as ShaderMaterial;
-		this.controls = null as unknown as OrbitControls;
-		this.textureLoader = null as unknown as TextureLoader;
-		this.debugPanel = null as unknown as Pane;
 
 		this.init(canvas);
 	}
@@ -58,28 +51,28 @@ export default class Playground {
 
 	// Configure the camera
 	setupCamera() {
-		this.camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 3);
-		this.camera.position.set(0, 0, 1);
+		this._camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 3);
+		this._camera.position.set(0, 0, 1);
 	}
 
 	// Create and configure the scene
 	setupScene() {
-		this.scene = new Scene();
+		this._scene = new Scene();
 	}
 
 	// Configure the renderer
 	setupRenderer(canvas: HTMLCanvasElement) {
-		this.renderer = new WebGLRenderer({
+		this._renderer = new WebGLRenderer({
 			canvas,
 		});
 
-		this.renderer.setSize(this.viewport.width, this.viewport.height);
-		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		this._renderer.setSize(this._viewport.width, this._viewport.height);
+		this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 	}
 
 	// Create and configure the mesh
 	setupMesh() {
-		this.textureLoader = new TextureLoader();
+		this._textureLoader = new TextureLoader();
 
 		const textures = {
 		} as Record<string, Texture>;
@@ -93,9 +86,9 @@ export default class Playground {
 			}
 		});
 
-		this.material = new MeshBasicMaterial({ side: DoubleSide });
+		this._material = new MeshBasicMaterial({ side: DoubleSide });
 
-		this.material.onBeforeCompile = (shader) => {
+		this._material.onBeforeCompile = (shader) => {
 			shader.vertexShader = "varying vec2 vUv;\n" + shader.vertexShader;
 			shader.vertexShader = shader.vertexShader.replace(
 				"#include <begin_vertex>",
@@ -113,47 +106,59 @@ export default class Playground {
 			);
 		};
 
-		this.mesh = new Mesh(new PlaneGeometry(1, 1), this.material);
+		this._mesh = new Mesh(new PlaneGeometry(1, 1), this._material);
 
-		this.scene.add(this.mesh);
+		this._scene?.add(this._mesh);
 	}
 
 	// Setup the debug panel
 	setupDebugPanel() {
-		const debugPanel = new PaneUtils();
-		this.debugPanel = debugPanel.getPane();
+		this._debugPanel = new PaneUtils().pane;
 
-		if (this.debugPanel) {
+		if (this._debugPanel) {
 			// const folder = this.debugPanel.addFolder({ title: 'Settings' });
 
 		}
 	}
 	// Configure controls
 	setupControls() {
-		this.controls = new OrbitControls(this.camera, document.querySelector("canvas"));
-		this.controls.enableDamping = true;
+		const canvas = document.querySelector("canvas");
+		if (!canvas) {
+			console.error("Canvas element not found.");
+			return;
+		}
+		if (!this._camera) {
+			console.error("Camera not initialized.");
+			return;
+		}
+		this._controls = new OrbitControls(this._camera, canvas);
+		this._controls.enableDamping = true;
 	}
-
-	// Render the scene
 	render(time: number) {
-		this.controls.update(time);
+		if (this._controls) {
+			this._controls.update(time);
+		}
 
-		this.renderer.render(this.scene, this.camera);
+		if (this._renderer && this._scene && this._camera) {
+			this._renderer.render(this._scene, this._camera);
+		}
 		requestAnimationFrame(this.render.bind(this));
 	}
 
 	// Handle viewport resize
 	resize() {
-		this.viewport = {
+		this._viewport = {
 			width: window.innerWidth,
 			height: window.innerHeight,
 		};
+		if (this._camera && 'updateProjectionMatrix' in this._camera && typeof this._camera.updateProjectionMatrix === 'function') {
+			this._camera.updateProjectionMatrix();
+		}
 
-
-		this.camera.updateProjectionMatrix();
-
-		this.renderer.setSize(this.viewport.width, this.viewport.height);
-		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		if (this._renderer) {
+			this._renderer.setSize(this._viewport.width, this._viewport.height);
+			this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		}
 	}
 
 	// Dispose resources

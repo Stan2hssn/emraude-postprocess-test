@@ -1,10 +1,10 @@
 import { Pane } from "tweakpane";
 
 export class PaneUtils {
-    private pane: Pane;
+    private _pane: Pane;
 
     constructor() {
-        this.pane = new Pane({
+        this._pane = new Pane({
             title: 'Debug Panel',
         });
     }
@@ -13,7 +13,7 @@ export class PaneUtils {
         return this.pane.addFolder({ title: name });
     }
 
-    public getPane() {
-        return this.pane;
+    public get pane() {
+        return this._pane;
     }
 }
