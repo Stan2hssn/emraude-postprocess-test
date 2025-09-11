@@ -1,34 +1,40 @@
+import PostProcessing from '@/postprocessing/PostProcessing';
+import Stats from 'stats-gl';
 import {
 	Camera,
-	DoubleSide,
-	Mesh,
-	MeshBasicMaterial,
+	Color,
+	EquirectangularReflectionMapping,
 	OrthographicCamera,
-	PlaneGeometry,
+	PCFSoftShadowMap,
+	PerspectiveCamera,
+	PMREMGenerator,
 	Scene,
-	ShaderMaterial,
-	SRGBColorSpace,
-	Texture,
 	TextureLoader,
 	WebGLRenderer
 } from 'three';
+// import { ThreePerf } from 'three-perf';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Pane } from 'tweakpane';
 import { PaneUtils } from './PaneUtils';
+import Power from './Powers/Power';
+
+
 
 
 export default class Playground {
 	private _viewport: Record<'width' | 'height', number>;
-	private _camera: OrthographicCamera | Camera | null = null;
+	private _camera: OrthographicCamera | PerspectiveCamera | Camera | null = null;
 	private _scene: Scene | null = null;
 	private _renderer: WebGLRenderer | null = null;
-	private _mesh: Mesh | null = null;
-	private _material: MeshBasicMaterial | ShaderMaterial | null = null;
 	private _controls: OrbitControls | null = null;
-	public _textureLoader = new TextureLoader();
+	private _postprocessing: PostProcessing | undefined;
+
+	private _stats: Stats | undefined = undefined;
+	// private _perf: ThreePerf | undefined = undefined;
+
+	private _power: Power | undefined = undefined;
+
 	public _debugPanel: Pane | null = null;
-
-
 
 	constructor(canvas: HTMLCanvasElement) {
 		this._viewport = {
@@ -44,20 +50,69 @@ export default class Playground {
 		this.setupCamera();
 		this.setupScene();
 		this.setupRenderer(canvas);
-		this.setupMesh();
+		this.setupComposer();
+		this.setupPowers();
 		this.setupControls();
 		this.setupDebugPanel();
+		this.setupStats();
+	}
+
+	setupStats() {
+		this._stats = new Stats({
+			trackGPU: true,
+			trackHz: true,
+			trackCPT: true,
+			logsPerSecond: 4,
+			graphsPerSecond: 30,
+			samplesLog: 40,
+			samplesGraph: 10,
+			precision: 2,
+			horizontal: false,
+			minimal: false,
+			mode: 2,
+		});
+
+		// if (this._stats && this._renderer) {
+		this._renderer?.domElement.parentElement?.appendChild(this._stats.dom);
+		this._stats.init(this._renderer);
+
+		// 	this._perf = new ThreePerf({
+		// 		anchorX: 'right',
+		// 		anchorY: 'bottom',
+		// 		domElement: document.body, // or other canvas rendering wrapper
+		// 		renderer: this._renderer // three js renderer instance you use for rendering
+		// 	});
+		// }
 	}
 
 	// Configure the camera
 	setupCamera() {
-		this._camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 3);
-		this._camera.position.set(0, 0, 1);
+		this._camera = new PerspectiveCamera(80, this._viewport.width / this._viewport.height, 0.1, 1000);
+		this._camera.position.set(6, 4, 7);
+		this._camera.lookAt(0, 0, 0);
 	}
 
 	// Create and configure the scene
 	setupScene() {
 		this._scene = new Scene();
+		this._scene.background = new Color(0x060606);
+
+		const loader = new TextureLoader();
+		loader.load('/envMap/EnvMap.png', (texture) => {
+			texture.mapping = EquirectangularReflectionMapping;
+
+			const pmremGenerator = new PMREMGenerator(this._renderer!);
+			pmremGenerator.compileEquirectangularShader();
+
+			const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+
+			this._scene!.environment = envMap;
+			this._scene!.environmentIntensity = .1;
+
+			texture.dispose();
+			pmremGenerator.dispose();
+		});
+
 	}
 
 	// Configure the renderer
@@ -65,61 +120,77 @@ export default class Playground {
 		this._renderer = new WebGLRenderer({
 			canvas,
 		});
+		this._renderer.shadowMap.enabled = true;
+		this._renderer.shadowMap.type = PCFSoftShadowMap;
 
 		this._renderer.setSize(this._viewport.width, this._viewport.height);
 		this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 	}
 
 	// Create and configure the mesh
-	setupMesh() {
-		this._textureLoader = new TextureLoader();
+	setupPowers() {
+		this._power = new Power;
 
-		const textures = {
-		} as Record<string, Texture>;
+		this._scene?.add(this._power?.componentsGroup);
 
-		Object.values(textures).forEach((texture: Texture) => {
-			if (!texture) {
-				console.error(`Texture failed to load.`);
-			} else {
-				texture.colorSpace = SRGBColorSpace;
-				texture.flipY = false;
-			}
-		});
+		console.log('scene', this._scene);
 
-		this._material = new MeshBasicMaterial({ side: DoubleSide });
-
-		this._material.onBeforeCompile = (shader) => {
-			shader.vertexShader = "varying vec2 vUv;\n" + shader.vertexShader;
-			shader.vertexShader = shader.vertexShader.replace(
-				"#include <begin_vertex>",
-				`
-			  #include <begin_vertex>
-			  vUv = uv;
-			`
-			);
-			shader.fragmentShader = "varying vec2 vUv;\n" + shader.fragmentShader;
-			shader.fragmentShader = shader.fragmentShader.replace(
-				"#include <color_fragment>",
-				`
-			  diffuseColor.rgb = vec3(vUv, 1.0);
-			`
-			);
-		};
-
-		this._mesh = new Mesh(new PlaneGeometry(1, 1), this._material);
-
-		this._scene?.add(this._mesh);
 	}
 
 	// Setup the debug panel
 	setupDebugPanel() {
 		this._debugPanel = new PaneUtils().pane;
+		if (!this._debugPanel) return;
 
-		if (this._debugPanel) {
-			// const folder = this.debugPanel.addFolder({ title: 'Settings' });
+		// 🌍 OrbitControls
+		const controlsFolder = this._debugPanel.addFolder({ title: "🌀 Orbit Controls", expanded: false });
+		const controlsState = { active: true };
+		controlsFolder.addBinding(controlsState, "active", {
+			label: "Enable",
+		}).on("change", (ev) => {
+			if (this._controls) this._controls.enabled = ev.value;
+		});
 
+		// 🎥 Camera
+		if (this._camera) {
+			const camFolder = this._debugPanel.addFolder({ title: "🎥 Camera Settings", expanded: false });
+
+			if ((this._camera as any).isPerspectiveCamera) {
+				const cam = this._camera as PerspectiveCamera;
+				camFolder.addBinding(cam, "fov", {
+					label: "Field of View",
+					min: 10, max: 120, step: 1,
+				}).on("change", () => cam.updateProjectionMatrix());
+			}
+
+			if ((this._camera as any).isOrthographicCamera) {
+				const cam = this._camera as OrthographicCamera;
+				camFolder.addBinding(cam, "zoom", {
+					label: "Zoom",
+					min: 0.1, max: 5, step: 0.01,
+				}).on("change", () => cam.updateProjectionMatrix());
+			}
+
+			const posFolder = camFolder.addFolder({ title: "📍 Position", expanded: false });
+			posFolder.addBinding(this._camera.position, "x", { label: "X", min: -20, max: 20, step: 0.1 });
+			posFolder.addBinding(this._camera.position, "y", { label: "Y", min: -20, max: 20, step: 0.1 });
+			posFolder.addBinding(this._camera.position, "z", { label: "Z", min: -20, max: 20, step: 0.1 });
+		}
+
+		// ✨ PostProcessing
+		if (this._postprocessing) {
+			const ppFolder = this._debugPanel.addFolder({ title: "✨ PostProcessing" });
+
+			const ppState = { active: true };
+			ppFolder.addBinding(ppState, "active", { label: "Enable" })
+				.on("change", (ev) => this._postprocessing!.setEnabled(ev.value));
+
+			// Let PostProcessing populate its own sub-folders
+			this._postprocessing.setupDebugPanel(ppFolder);
 		}
 	}
+
+
 	// Configure controls
 	setupControls() {
 		const canvas = document.querySelector("canvas");
@@ -133,15 +204,36 @@ export default class Playground {
 		}
 		this._controls = new OrbitControls(this._camera, canvas);
 		this._controls.enableDamping = true;
+		this._controls.target.set(0, 0, 0);
 	}
+
+
+	setupComposer() {
+		this._postprocessing = new PostProcessing({
+			renderer: this._renderer as WebGLRenderer,
+			scene: this._scene as Scene,
+			camera: this._camera as OrthographicCamera | PerspectiveCamera | Camera,
+			pixelRatio: window.devicePixelRatio,
+			width: this._viewport.width,
+			height: this._viewport.height
+		}
+		);
+	}
+
 	render(time: number) {
-		if (this._controls) {
-			this._controls.update(time);
+		if (this._stats) this._stats.update();
+		if (this._power) this._power.render(time / 1000);
+		if (this._controls) this._controls.update();
+
+		// Always call PostProcessing.render; it will bypass when disabled
+		if (this._postprocessing) {
+			this._postprocessing.render();
+		} else if (this._renderer && this._scene && this._camera) {
+			// if (this._perf) this._perf.begin();
+			this._renderer.render(this._scene, this._camera);
+			// if (this._perf) this._perf.end();
 		}
 
-		if (this._renderer && this._scene && this._camera) {
-			this._renderer.render(this._scene, this._camera);
-		}
 		requestAnimationFrame(this.render.bind(this));
 	}
 
@@ -151,8 +243,23 @@ export default class Playground {
 			width: window.innerWidth,
 			height: window.innerHeight,
 		};
-		if (this._camera && 'updateProjectionMatrix' in this._camera && typeof this._camera.updateProjectionMatrix === 'function') {
-			this._camera.updateProjectionMatrix();
+
+		this._postprocessing?.resize(this._viewport.width, this._viewport.height);
+
+		if (this._camera) {
+			// Only PerspectiveCamera has 'aspect' and 'updateProjectionMatrix'
+			if ('isPerspectiveCamera' in this._camera && (this._camera as any).isPerspectiveCamera) {
+				const perspectiveCamera = this._camera as PerspectiveCamera;
+				perspectiveCamera.aspect = this._viewport.width / this._viewport.height;
+				perspectiveCamera.updateProjectionMatrix();
+			}
+			// Only OrthographicCamera has 'updateProjectionMatrix'
+			else if ('isOrthographicCamera' in this._camera && (this._camera as any).isOrthographicCamera) {
+				const orthoCamera = this._camera as OrthographicCamera;
+				// OrthographicCamera does not have 'aspect', but you may want to update left/right/top/bottom here if needed
+				orthoCamera.updateProjectionMatrix();
+			}
+			this._camera.updateMatrixWorld();
 		}
 
 		if (this._renderer) {
