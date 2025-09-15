@@ -1,4 +1,3 @@
-import PostProcessing from '@/postprocessing/PostProcessing';
 import Stats from 'stats-gl';
 import {
 	Camera,
@@ -17,6 +16,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Pane } from 'tweakpane';
 import { PaneUtils } from './PaneUtils';
 import Power from './Powers/Power';
+import PostProcessingManager from './postprocessing/PostProcessingManager';
 
 
 
@@ -27,7 +27,7 @@ export default class Playground {
 	private _scene: Scene | null = null;
 	private _renderer: WebGLRenderer | null = null;
 	private _controls: OrbitControls | null = null;
-	private _postprocessing: PostProcessing | undefined;
+	private _postprocessing: PostProcessingManager | undefined;
 
 	private _stats: Stats | undefined = undefined;
 	// private _perf: ThreePerf | undefined = undefined;
@@ -142,8 +142,17 @@ export default class Playground {
 		this._debugPanel = new PaneUtils().pane;
 		if (!this._debugPanel) return;
 
+		const tab = this._debugPanel.addTab({
+			pages: [
+				{ title: "🌐 Global Settings" },
+				{ title: "✨ PostProcessing" },
+			],
+		});
+
+		const globalTab = tab.pages[0];
+
 		// 🌍 OrbitControls
-		const controlsFolder = this._debugPanel.addFolder({ title: "🌀 Orbit Controls", expanded: false });
+		const controlsFolder = globalTab.addFolder({ title: "🌀 Orbit Controls", expanded: false });
 		const controlsState = { active: true };
 		controlsFolder.addBinding(controlsState, "active", {
 			label: "Enable",
@@ -153,7 +162,7 @@ export default class Playground {
 
 		// 🎥 Camera
 		if (this._camera) {
-			const camFolder = this._debugPanel.addFolder({ title: "🎥 Camera Settings", expanded: false });
+			const camFolder = globalTab.addFolder({ title: "🎥 Camera Settings", expanded: false });
 
 			if ((this._camera as any).isPerspectiveCamera) {
 				const cam = this._camera as PerspectiveCamera;
@@ -179,14 +188,10 @@ export default class Playground {
 
 		// ✨ PostProcessing
 		if (this._postprocessing) {
-			const ppFolder = this._debugPanel.addFolder({ title: "✨ PostProcessing" });
-
-			const ppState = { active: true };
-			ppFolder.addBinding(ppState, "active", { label: "Enable" })
-				.on("change", (ev) => this._postprocessing!.setEnabled(ev.value));
+			const ppTab = tab.pages[1];
 
 			// Let PostProcessing populate its own sub-folders
-			this._postprocessing.setupDebugPanel(ppFolder);
+			this._postprocessing.setupDebugPanel(ppTab);
 		}
 	}
 
@@ -209,7 +214,7 @@ export default class Playground {
 
 
 	setupComposer() {
-		this._postprocessing = new PostProcessing({
+		this._postprocessing = new PostProcessingManager({
 			renderer: this._renderer as WebGLRenderer,
 			scene: this._scene as Scene,
 			camera: this._camera as OrthographicCamera | PerspectiveCamera | Camera,
@@ -227,7 +232,7 @@ export default class Playground {
 
 		// Always call PostProcessing.render; it will bypass when disabled
 		if (this._postprocessing) {
-			this._postprocessing.render();
+			this._postprocessing.render(time);
 		} else if (this._renderer && this._scene && this._camera) {
 			// if (this._perf) this._perf.begin();
 			this._renderer.render(this._scene, this._camera);

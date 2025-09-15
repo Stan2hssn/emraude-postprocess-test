@@ -22,6 +22,11 @@ export default class LateNight {
                             child.castShadow = true;
                             child.receiveShadow = true;
 
+                            if ((child as any).userData.isGlass) {
+                                child.castShadow = false;
+                                child.receiveShadow = false;
+                            }
+
                             if ((child as any).userData.isEmmisive) {
                                 const color = (child as any).material.emissive;
 

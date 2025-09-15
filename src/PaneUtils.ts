@@ -5,7 +5,6 @@ export class PaneUtils {
 
     constructor() {
         this._pane = new Pane();
-        this._pane.addFolder({ title: 'Debug Panel', expanded: false });
     }
 
     public addFolder(name: string) {

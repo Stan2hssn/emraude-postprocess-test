@@ -1,4 +1,4 @@
-import { Color, DirectionalLight, Group, Mesh, MeshStandardMaterial, OrthographicCamera, PlaneGeometry, PointLight, type Object3D } from "three";
+import { Color, DirectionalLight, Group, Mesh, OrthographicCamera, PlaneGeometry, PointLight, ShadowMaterial, type Object3D } from "three";
 import LateNight from "./LateNight";
 
 export default class Power {
@@ -26,22 +26,26 @@ export default class Power {
     _setupLight(): void {
         const point = new PointLight(new Color(0xCFD3FF), 1);
         point.position.set(0, 2, 0);
-        this._lightsGroup.add(point);
+        // this._lightsGroup.add(point);
+
+        const offset = 0.3;
 
         const lanternsPositions = [
-            { x: 5, y: 3, z: 5 },
-            { x: -5, y: 3, z: 5 },
-            { x: 5, y: 3, z: -5 },
-            { x: -5, y: 3, z: -5 },
+            { x: 2 + offset, y: 1.7, z: 1.5 + offset },
+            { x: -2 - offset, y: 1.7, z: 1.5 + offset },
+            { x: 2 + offset, y: 1.7, z: -1.5 - offset },
+            { x: -2 + -offset, y: 1.7, z: -1.5 - offset },
         ];
 
         lanternsPositions.forEach((pos) => {
-            const lantern = new PointLight(new Color(0xCFD3FF), 10);
+            const lantern = new PointLight(new Color(0xFFC639), .7);
             lantern.position.set(pos.x, pos.y, pos.z);
+            lantern.scale.set(0.5, 2, 0.5);
+
             this._lightsGroup.add(lantern);
         });
 
-        const backLight = new DirectionalLight(new Color(0xCFD3FF), 2);
+        const backLight = new DirectionalLight(new Color(0x9CA4FF), 2);
         backLight.position.set(0, 7, -10); // elevate & angle a bit
         backLight.castShadow = true;
 
@@ -61,11 +65,10 @@ export default class Power {
 
         backLight.target.position.set(0, 0, 0);
 
-        const frontLight = new DirectionalLight(new Color(0xFEAD00), 1);
-        frontLight.position.set(-5, 10, 20); // elevate & angle a bit
+        const frontLight = new DirectionalLight(new Color(0xFFA143), .5);
+        frontLight.position.set(0, 5, 5); // elevate & angle a bit
         frontLight.castShadow = true;
 
-        frontLight.shadow.mapSize.set(2048, 2048);
 
         const frontCam = frontLight.shadow.camera as OrthographicCamera;
         frontCam.left = -60;
@@ -84,10 +87,10 @@ export default class Power {
         this._lightsGroup.add(backLight.target, frontLight.target);
 
         // Helpers
-        // const directionalHelper = new DirectionalLightHelper(directionalLight, 2);
-        // const shadowCamHelper = new CameraHelper(directionalLight.shadow.camera);
+        // const directionalHelper = new DirectionalLightHelper(frontLight, 2);
+        // const shadowCamHelper = new CameraHelper(frontLight.shadow.camera);
 
-        this._lightsGroup.add(backLight, frontLight);
+        this._lightsGroup.add(backLight, frontLight, point);
     }
 
     _setupMeshes(): void {
@@ -96,7 +99,7 @@ export default class Power {
 
         const floor = new Mesh(
             new PlaneGeometry(1000, 1000),
-            new MeshStandardMaterial({ color: new Color(0x000000) })
+            new ShadowMaterial({ color: new Color(0x000000) })
         );
         floor.rotation.x = - Math.PI * 0.5;
         floor.position.y = -.4;
