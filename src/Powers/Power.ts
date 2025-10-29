@@ -1,12 +1,10 @@
-import { BoxGeometry, Color, DirectionalLight, Group, Mesh, MeshStandardMaterial, OrthographicCamera, PlaneGeometry, PointLight, ShadowMaterial, type Object3D } from "three";
+import { BoxGeometry, Color, DirectionalLight, Group, Mesh, MeshStandardMaterial, OrthographicCamera, PlaneGeometry, PointLight, ShadowMaterial } from "three";
 import LateNight from "./LateNight";
 
 export default class Power {
     private _componentsGroup: Group = new Group;
     private _lightsGroup: Group = new Group;
     private _meshesGroup: Group = new Group;
-
-    private _components: Record<string, Object3D> = {};
 
     private _lateNight: LateNight | undefined = undefined;
 
