@@ -1,4 +1,4 @@
-import { Color, DirectionalLight, Group, Mesh, OrthographicCamera, PlaneGeometry, PointLight, ShadowMaterial, type Object3D } from "three";
+import { BoxGeometry, Color, DirectionalLight, Group, Mesh, MeshStandardMaterial, OrthographicCamera, PlaneGeometry, PointLight, ShadowMaterial, type Object3D } from "three";
 import LateNight from "./LateNight";
 
 export default class Power {
@@ -105,16 +105,29 @@ export default class Power {
         floor.position.y = -.4;
         floor.receiveShadow = true;
 
+        for (let i = 0; i < 10; i++) {
+            const cubes = new Mesh(
+                new BoxGeometry(1, 1, 1),
+                new MeshStandardMaterial({ color: new Color(0xffffff) })
+            );
+            cubes.position.set(i * Math.random() * 2, i * Math.random(), (i - 5) * Math.random() * 2);
+            cubes.castShadow = true;
+            cubes.receiveShadow = true;
+
+            this._meshesGroup.add(cubes);
+        }
         this._meshesGroup.add(floor);
 
-        this._lateNight.whenReady().then((model) => {
-            this._components.lateNight = model;
-            this._components.lateNight.receiveShadow = true;
-            this._components.lateNight.castShadow = true;
-            this._meshesGroup.add(model);
-        }).catch(() => {
-            // swallow; error already logged in loader
-        });
+        // this._lateNight.whenReady().then((model) => {
+        //     this._components.lateNight = model;
+        //     this._components.lateNight.receiveShadow = true;
+        //     this._components.lateNight.castShadow = true;
+        //     // this._meshesGroup.add(model);
+        // }).catch(() => {
+        //     // swallow; error already logged in loader
+        // });
+
+
     }
 
     public render(t: number): void {

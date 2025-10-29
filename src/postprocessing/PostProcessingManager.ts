@@ -146,7 +146,7 @@ export default class PostProcessingManager {
         if (!this._composer) return;
         this._effects.smaa = new SMAAEffect({
             preset: SMAAPreset.HIGH,
-            edgeDetectionMode: EdgeDetectionMode.DEPTH,
+            edgeDetectionMode: EdgeDetectionMode.COLOR,
             ...{
                 searchImage: this._assets["smaa-search"]!,
                 areaImage: this._assets["smaa-area"]!

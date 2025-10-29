@@ -118,6 +118,8 @@ export default class Playground {
 	// Configure the renderer
 	setupRenderer(canvas: HTMLCanvasElement) {
 		this._renderer = new WebGLRenderer({
+			antialias: false,
+			powerPreference: "high-performance",
 			canvas,
 		});
 		this._renderer.shadowMap.enabled = true;
